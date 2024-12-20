@@ -1,3 +1,9 @@
+2024.12.21 0:31
+【lstk】这个参数是全局线条。
+在convert.py中，449 行，注销掉。
+#ops += f"ET q 1 0 0 1 {l.pts[0][0]:f} {l.pts[0][1]:f} cm [] 0 d 0 J {l.linewidth:f} w 0 0 m {l.pts[1][0] - l.pts[0][0]:f} {l.pts[1][1] - l.pts[0][1]:f} l S Q BT "
+但是有一点问题，就是表格没有了第一横行的横线。
+引用的格式没了，全堆一起了，实际上，引用可以不用翻译。
 2024.12.20
 调试记录
 1、在window环境下，直接双击安装setip.bat,直接安装了python的环境。安装完可以直接运行，会自行下载yolo布局模型的权重。随后自己运行，那就 .\pdf2zh_dist\python.exe pdf2zh\pdf2zh.py -i
