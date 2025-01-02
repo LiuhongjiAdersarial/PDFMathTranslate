@@ -8,7 +8,7 @@ import tempfile
 import urllib.request
 from asyncio import CancelledError
 from pathlib import Path
-from typing import Any, BinaryIO, List, Optional
+from typing import Any, BinaryIO, List, Optional, Dict
 
 import numpy as np
 import requests
@@ -21,10 +21,8 @@ from pdfminer.pdfparser import PDFParser
 from pymupdf import Document, Font
 
 from pdf2zh.converter import TranslateConverter
-from pdf2zh.doclayout import DocLayoutModel
+from pdf2zh.doclayout import OnnxModel
 from pdf2zh.pdfinterp import PDFPageInterpreterEx
-
-model = DocLayoutModel.load_available()
 
 resfont_map = {
     "zh-cn": "china-ss",
@@ -88,6 +86,9 @@ def translate_patch(
     noto: Font = None,
     callback: object = None,
     cancellation_event: asyncio.Event = None,
+    model: OnnxModel = None,
+    envs: Dict = None,
+    prompt: List = None,
     **kwarg: Any,
 ) -> None:
     rsrcmgr = PDFResourceManager()
@@ -103,8 +104,8 @@ def translate_patch(
         service,
         resfont,
         noto,
-        kwarg.get("envs", {}),
-        kwarg.get("prompt", []),
+        envs,
+        prompt,
     )
 
     assert device is not None
@@ -179,6 +180,9 @@ def translate_stream(
     vchar: str = "",
     callback: object = None,
     cancellation_event: asyncio.Event = None,
+    model: OnnxModel = None,
+    envs: Dict = None,
+    prompt: List = None,
     **kwarg: Any,
 ):
     font_list = [("tiro", None)]
@@ -234,7 +238,7 @@ def translate_stream(
 
     fp = io.BytesIO()
     doc_zh.save(fp)
-    obj_patch: dict = translate_patch(fp, prompt=kwarg["prompt"], **locals())
+    obj_patch: dict = translate_patch(fp, **locals())
 
     for obj_id, ops_new in obj_patch.items():
         # ops_old=doc_en.xref_stream(obj_id)
@@ -312,6 +316,9 @@ def translate(
     callback: object = None,
     compatible: bool = False,
     cancellation_event: asyncio.Event = None,
+    model: OnnxModel = None,
+    envs: Dict = None,
+    prompt: List = None,
     **kwarg: Any,
 ):
     if not files:
@@ -364,11 +371,8 @@ def translate(
 
         if file.startswith(tempfile.gettempdir()):
             os.unlink(file)
-
         s_mono, s_dual = translate_stream(
             s_raw,
-            envs=kwarg.get("envs", {}),
-            prompt=kwarg.get("prompt", []),
             **locals(),
         )
         file_mono = Path(output) / f"{filename}-mono.pdf"
