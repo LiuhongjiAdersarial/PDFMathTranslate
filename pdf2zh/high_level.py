@@ -3,11 +3,13 @@
 import asyncio
 import io
 import os
+import re
 import sys
 import tempfile
-import urllib.request
+import logging
 from asyncio import CancelledError
 from pathlib import Path
+from string import Template
 from typing import Any, BinaryIO, List, Optional, Dict
 
 import numpy as np
@@ -24,7 +26,12 @@ from pdf2zh.converter import TranslateConverter
 from pdf2zh.doclayout import OnnxModel
 from pdf2zh.pdfinterp import PDFPageInterpreterEx
 
+from pdf2zh.config import ConfigManager
+from babeldoc.assets.assets import get_font_and_metadata
+
 NOTO_NAME = "noto"
+
+logger = logging.getLogger(__name__)
 
 noto_list = [
     "am",  # Amharic
@@ -76,7 +83,8 @@ def translate_patch(
     cancellation_event: asyncio.Event = None,
     model: OnnxModel = None,
     envs: Dict = None,
-    prompt: List = None,
+    prompt: Template = None,
+    ignore_cache: bool = False,
     **kwarg: Any,
 ) -> None:
     rsrcmgr = PDFResourceManager()
@@ -94,6 +102,7 @@ def translate_patch(
         noto,
         envs,
         prompt,
+        ignore_cache,
     )
 
     assert device is not None
@@ -170,7 +179,9 @@ def translate_stream(
     cancellation_event: asyncio.Event = None,
     model: OnnxModel = None,
     envs: Dict = None,
-    prompt: List = None,
+    prompt: Template = None,
+    skip_subset_fonts: bool = False,
+    ignore_cache: bool = False,
     **kwarg: Any,
 ):
     font_list = [("tiro", None)]
@@ -195,13 +206,21 @@ def translate_stream(
         for label in ["Resources/", ""]:  # 可能是基于 xobj 的 res
             try:  # xref 读写可能出错
                 font_res = doc_zh.xref_get_key(xref, f"{label}Font")
+                target_key_prefix = f"{label}Font/"
+                if font_res[0] == "xref":
+                    resource_xref_id = re.search("(\\d+) 0 R", font_res[1]).group(1)
+                    xref = int(resource_xref_id)
+                    font_res = ("dict", doc_zh.xref_object(xref))
+                    target_key_prefix = ""
+
                 if font_res[0] == "dict":
                     for font in font_list:
-                        font_exist = doc_zh.xref_get_key(xref, f"{label}Font/{font[0]}")
+                        target_key = f"{target_key_prefix}{font[0]}"
+                        font_exist = doc_zh.xref_get_key(xref, target_key)
                         if font_exist[0] == "null":
                             doc_zh.xref_set_key(
                                 xref,
-                                f"{label}Font/{font[0]}",
+                                target_key,
                                 f"{font_id[font[0]]} 0 R",
                             )
             except Exception:
@@ -222,9 +241,9 @@ def translate_stream(
     doc_en.insert_file(doc_zh)
     for id in range(page_count):
         doc_en.move_page(page_count + id, id * 2 + 1)
-
-    doc_zh.subset_fonts(fallback=True)
-    doc_en.subset_fonts(fallback=True)
+    if not skip_subset_fonts:
+        doc_zh.subset_fonts(fallback=True)
+        doc_en.subset_fonts(fallback=True)
     return (
         doc_zh.write(deflate=True, garbage=3, use_objstms=1),
         doc_en.write(deflate=True, garbage=3, use_objstms=1),
@@ -295,7 +314,9 @@ def translate(
     cancellation_event: asyncio.Event = None,
     model: OnnxModel = None,
     envs: Dict = None,
-    prompt: List = None,
+    prompt: Template = None,
+    skip_subset_fonts: bool = False,
+    ignore_cache: bool = False,
     **kwarg: Any,
 ):
     if not files:
@@ -312,7 +333,9 @@ def translate(
     result_files = []
 
     for file in files:
-        if file is str and (file.startswith("http://") or file.startswith("https://")):
+        if type(file) is str and (
+            file.startswith("http://") or file.startswith("https://")
+        ):
             print("Online files detected, downloading...")
             try:
                 r = requests.get(file, allow_redirects=True)
@@ -346,8 +369,17 @@ def translate(
         s_raw = doc_raw.read()
         doc_raw.close()
 
-        if file.startswith(tempfile.gettempdir()):
-            os.unlink(file)
+        temp_dir = Path(tempfile.gettempdir())
+        file_path = Path(file)
+        try:
+            if file_path.exists() and file_path.resolve().is_relative_to(
+                temp_dir.resolve()
+            ):
+                file_path.unlink(missing_ok=True)
+                logger.debug(f"Cleaned temp file: {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to clean temp file {file_path}", exc_info=True)
+
         s_mono, s_dual = translate_stream(
             s_raw,
             **locals(),
@@ -366,7 +398,7 @@ def translate(
 
 
 def download_remote_fonts(lang: str):
-    URL_PREFIX = "https://github.com/timelic/source-han-serif/releases/download/main/"
+    lang = lang.lower()
     LANG_NAME_MAP = {
         **{la: "GoNotoKurrent-Regular.ttf" for la in noto_list},
         **{
@@ -383,11 +415,11 @@ def download_remote_fonts(lang: str):
     font_name = LANG_NAME_MAP.get(lang, "GoNotoKurrent-Regular.ttf")
 
     # docker
-    font_path = os.environ.get("NOTO_FONT_PATH", Path("/app", font_name).as_posix())
+    font_path = ConfigManager.get("NOTO_FONT_PATH", Path("/app", font_name).as_posix())
     if not Path(font_path).exists():
-        font_path = Path(tempfile.gettempdir(), font_name).as_posix()
-    if not Path(font_path).exists():
-        print(f"Downloading {font_name}...")
-        urllib.request.urlretrieve(f"{URL_PREFIX}{font_name}", font_path)
+        font_path, _ = get_font_and_metadata(font_name)
+        font_path = font_path.as_posix()
+
+    logger.info(f"use font: {font_path}")
 
     return font_path

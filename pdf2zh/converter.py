@@ -1,48 +1,45 @@
-from typing import Dict, List
-from enum import Enum
-
-from pdfminer.pdfinterp import PDFGraphicState, PDFResourceManager
-from pdfminer.pdffont import PDFCIDFont
-from pdfminer.converter import PDFConverter
-from pdfminer.pdffont import PDFUnicodeNotDefined
-from pdfminer.utils import apply_matrix_pt, mult_matrix
-from pdfminer.layout import (
-    LTChar,
-    LTFigure,
-    LTLine,
-    LTPage,
-)
+import concurrent.futures
 import logging
 import re
-import concurrent.futures
-import numpy as np
 import unicodedata
+from enum import Enum
+from string import Template
+from typing import Dict
+
+import numpy as np
+from pdfminer.converter import PDFConverter
+from pdfminer.layout import LTChar, LTFigure, LTLine, LTPage
+from pdfminer.pdffont import PDFCIDFont, PDFUnicodeNotDefined
+from pdfminer.pdfinterp import PDFGraphicState, PDFResourceManager
+from pdfminer.utils import apply_matrix_pt, mult_matrix
+from pymupdf import Font
 from tenacity import retry, wait_fixed
+
 from pdf2zh.translator import (
+    AnythingLLMTranslator,
+    ArgosTranslator,
     AzureOpenAITranslator,
+    AzureTranslator,
     BaseTranslator,
-    GoogleTranslator,
     BingTranslator,
     DeepLTranslator,
     DeepLXTranslator,
-    OllamaTranslator,
-    OpenAITranslator,
-    ZhipuTranslator,
-    ModelScopeTranslator,
-    SiliconTranslator,
-    GeminiTranslator,
-    AzureTranslator,
-    TencentTranslator,
-    DifyTranslator,
-    AnythingLLMTranslator,
-    XinferenceTranslator,
-    ArgosTranslator,
-    GorkTranslator,
-    GroqTranslator,
     DeepseekTranslator,
+    DifyTranslator,
+    GeminiTranslator,
+    GoogleTranslator,
+    GrokTranslator,
+    GroqTranslator,
+    ModelScopeTranslator,
+    OllamaTranslator,
     OpenAIlikedTranslator,
+    OpenAITranslator,
+    QwenMtTranslator,
+    SiliconTranslator,
+    TencentTranslator,
+    XinferenceTranslator,
+    ZhipuTranslator,
 )
-from pymupdf import Font
 
 log = logging.getLogger(__name__)
 
@@ -144,7 +141,8 @@ class TranslateConverter(PDFConverterEx):
         noto_name: str = "",
         noto: Font = None,
         envs: Dict = None,
-        prompt: List = None,
+        prompt: Template = None,
+        ignore_cache: bool = False,
     ) -> None:
         super().__init__(rsrcmgr)
         self.vfont = vfont
@@ -154,17 +152,16 @@ class TranslateConverter(PDFConverterEx):
         self.noto_name = noto_name
         self.noto = noto
         self.translator: BaseTranslator = None
+        # e.g. "ollama:gemma2:9b" -> ["ollama", "gemma2:9b"]
         param = service.split(":", 1)
         service_name = param[0]
         service_model = param[1] if len(param) > 1 else None
         if not envs:
             envs = {}
-        if not prompt:
-            prompt = []
         for translator in [GoogleTranslator, BingTranslator, DeepLTranslator, DeepLXTranslator, OllamaTranslator, XinferenceTranslator, AzureOpenAITranslator,
-                           OpenAITranslator, ZhipuTranslator, ModelScopeTranslator, SiliconTranslator, GeminiTranslator, AzureTranslator, TencentTranslator, DifyTranslator, AnythingLLMTranslator, ArgosTranslator, GorkTranslator, GroqTranslator, DeepseekTranslator, OpenAIlikedTranslator,]:
+                           OpenAITranslator, ZhipuTranslator, ModelScopeTranslator, SiliconTranslator, GeminiTranslator, AzureTranslator, TencentTranslator, DifyTranslator, AnythingLLMTranslator, ArgosTranslator, GrokTranslator, GroqTranslator, DeepseekTranslator, OpenAIlikedTranslator, QwenMtTranslator,]:
             if service_name == translator.name:
-                self.translator = translator(lang_in, lang_out, service_model, envs=envs, prompt=prompt)
+                self.translator = translator(lang_in, lang_out, service_model, envs=envs, prompt=prompt, ignore_cache=ignore_cache)
         if not self.translator:
             raise ValueError("Unsupported translation service")
 
@@ -188,8 +185,6 @@ class TranslateConverter(PDFConverterEx):
         xt_cls: int = -1                # 上一个字符所属段落，保证无论第一个字符属于哪个类别都可以触发新段落
         vmax: float = ltpage.width / 4  # 行内公式最大宽度
         ops: str = ""                   # 渲染结果
-
-
 
         def vflag(font: str, char: str):    # 匹配公式（和角标）字体
             if isinstance(font, bytes):     # 不一定能 decode，直接转 str
@@ -382,12 +377,15 @@ class TranslateConverter(PDFConverterEx):
             "ja": 1.1, "ko": 1.2, "en": 1.2, "ar": 1.0, "ru": 0.8, "uk": 0.8, "ta": 0.8
         }
         default_line_height = LANG_LINEHEIGHT_MAP.get(self.translator.lang_out.lower(), 1.1) # 小语种默认1.1
-
         _x, _y = 0, 0
-
         ops_list = []
-        gen_op_txt = lambda font, size, x, y, rtxt: f"/{font} {size:f} Tf 1 0 0 1 {x:f} {y:f} Tm [<{rtxt}>] TJ "
-        gen_op_line = lambda x, y, xlen, ylen, linewidth: f"ET q 1 0 0 1 {x:f} {y:f} cm [] 0 d 0 J {linewidth:f} w 0 0 m {xlen:f} {ylen:f} l S Q BT "
+
+        def gen_op_txt(font, size, x, y, rtxt):
+            return f"/{font} {size:f} Tf 1 0 0 1 {x:f} {y:f} Tm [<{rtxt}>] TJ "
+
+        def gen_op_line(x, y, xlen, ylen, linewidth):
+            return f"ET q 1 0 0 1 {x:f} {y:f} cm [] 0 d 0 J {linewidth:f} w 0 0 m {xlen:f} {ylen:f} l S Q BT "
+
         for id, new in enumerate(news):
             x: float = pstk[id].x                       # 段落初始横坐标
             y: float = pstk[id].y                       # 段落初始纵坐标
@@ -527,6 +525,7 @@ class TranslateConverter(PDFConverterEx):
 
         ops = f"BT {''.join(ops_list)}ET "
         return ops
+
 
 class OpType(Enum):
     TEXT = "text"

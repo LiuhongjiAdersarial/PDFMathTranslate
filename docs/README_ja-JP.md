@@ -1,6 +1,6 @@
 <div align="center">
 
-[English](../README.md) | [简体中文](README_zh-CN.md) | 日本語
+[English](../README.md) | [简体中文](README_zh-CN.md) | [繁體中文](README_zh-TW.md) | 日本語
 
 <img src="./images/banner.png" width="320px"  alt="PDF2ZH"/>  
 
@@ -39,7 +39,7 @@
 - 🌐 [複数の言語](#language) と [多様な翻訳サービス](#services) をサポート
 - 🤖 [コマンドラインツール](#usage)、[インタラクティブユーザーインターフェース](#gui)、および [Docker](#docker) を提供
 
-フィードバックは [GitHub Issues](https://github.com/Byaidu/PDFMathTranslate/issues)、[Telegram グループ](https://t.me/+Z9_SgnxmsmA5NzBl) または [QQ グループ](https://qm.qq.com/q/DixZCxQej0) でお気軽にどうぞ
+フィードバックは [GitHub Issues](https://github.com/Byaidu/PDFMathTranslate/issues)、[Telegram グループ](https://t.me/+Z9_SgnxmsmA5NzBl)
 
 <h2 id="updates">最近の更新</h2>
 
@@ -80,9 +80,14 @@ pdf2zhの実行には追加モデル（`wybxc/DocLayout-YOLO-DocStructBench-onnx
 set HF_ENDPOINT=https://hf-mirror.com
 ```
 
+For PowerShell user:
+```shell
+$env:HF_ENDPOINT = https://hf-mirror.com
+```
+
 <h3 id="cmd">方法1. コマンドライン</h3>
 
-  1. Pythonがインストールされていること (バージョン3.8 <= バージョン <= 3.12)
+  1. Pythonがインストールされていること (バージョン3.10 <= バージョン <= 3.12)
   2. パッケージをインストールします：
 
       ```bash
@@ -103,7 +108,7 @@ Python環境を事前にインストールする必要はありません
 
 <h3 id="gui">方法3. GUI</h3>
 
-1. Pythonがインストールされていること (バージョン3.8 <= バージョン <= 3.12)
+1. Pythonがインストールされていること (バージョン3.10 <= バージョン <= 3.12)
 2. パッケージをインストールします：
 
       ```bash
@@ -156,7 +161,8 @@ Python環境を事前にインストールする必要はありません
 
 <h2 id="usage">高度なオプション</h2>
 
-コマンドラインで翻訳コマンドを実行し、現在の作業ディレクトリに翻訳されたドキュメント `example-mono.pdf` とバイリンガルドキュメント `example-dual.pdf` を生成します。デフォルトではGoogle翻訳サービスを使用します。
+コマンドラインで翻訳コマンドを実行し、現在の作業ディレクトリに翻訳されたドキュメント `example-mono.pdf` とバイリンガルドキュメント `example-dual.pdf` を生成します。デフォルトではGoogle翻訳サービスを使用します。More support translation services can find [HERE](https://github.com/Byaidu/PDFMathTranslate/blob/main/docs/ADVANCED.md#services).
+
 
 <img src="./images/cmd.explained.png" width="580px"  alt="cmd"/>  
 
@@ -180,6 +186,8 @@ Python環境を事前にインストールする必要はありません
 | `--onnx` | [カスタムDocLayout-YOLO ONNXモデルの使用] | `pdf2zh --onnx [onnx/model/path]` |
 | `--serverport` | [カスタムWebUIポートを使用する] | `pdf2zh --serverport 7860` |
 | `--dir` | [batch translate] | `pdf2zh --dir /path/to/translate/` |
+| `--config` | [configuration file](https://github.com/Byaidu/PDFMathTranslate/blob/main/docs/ADVANCED.md#cofig) | `pdf2zh --config /path/to/config/config.json` |
+| `--serverport` | [custom gradio server port] | `pdf2zh --serverport 7860` |
 
 <h3 id="partial">全文または部分的なドキュメント翻訳</h3>
 
@@ -217,7 +225,7 @@ pdf2zh example.pdf -li en -lo ja
 |**OpenAI**|`openai`|`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`|`https://api.openai.com/v1`, `[Your Key]`, `gpt-4o-mini`|See [OpenAI](https://platform.openai.com/docs/overview)|
 |**AzureOpenAI**|`azure-openai`|`AZURE_OPENAI_BASE_URL`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_MODEL`|`[Your Endpoint]`, `[Your Key]`, `gpt-4o-mini`|See [Azure OpenAI](https://learn.microsoft.com/zh-cn/azure/ai-services/openai/chatgpt-quickstart?tabs=command-line%2Cjavascript-keyless%2Ctypescript-keyless%2Cpython&pivots=programming-language-python)|
 |**Zhipu**|`zhipu`|`ZHIPU_API_KEY`, `ZHIPU_MODEL`|`[Your Key]`, `glm-4-flash`|See [Zhipu](https://open.bigmodel.cn/dev/api/thirdparty-frame/openai-sdk)|
-| **ModelScope**       | `ModelScope`   |`MODELSCOPE_API_KEY`, `MODELSCOPE_MODEL`|`[Your Key]`, `Qwen/Qwen2.5-Coder-32B-Instruct`| See [ModelScope](https://www.modelscope.cn/docs/model-service/API-Inference/intro)|
+| **ModelScope**       | `modelscope`   |`MODELSCOPE_API_KEY`, `MODELSCOPE_MODEL`|`[Your Key]`, `Qwen/Qwen2.5-Coder-32B-Instruct`| See [ModelScope](https://www.modelscope.cn/docs/model-service/API-Inference/intro)|
 |**Silicon**|`silicon`|`SILICON_API_KEY`, `SILICON_MODEL`|`[Your Key]`, `Qwen/Qwen2.5-7B-Instruct`|See [SiliconCloud](https://docs.siliconflow.cn/quickstart)|
 |**Gemini**|`gemini`|`GEMINI_API_KEY`, `GEMINI_MODEL`|`[Your Key]`, `gemini-1.5-flash`|See [Gemini](https://ai.google.dev/gemini-api/docs/openai)|
 |**Azure**|`azure`|`AZURE_ENDPOINT`, `AZURE_API_KEY`|`https://api.translator.azure.cn`, `[Your Key]`|See [Azure](https://docs.azure.cn/en-us/ai-services/translator/text-translation-overview)|
@@ -227,7 +235,7 @@ pdf2zh example.pdf -li en -lo ja
 |**Argos Translate**|`argos`| | |See [argos-translate](https://github.com/argosopentech/argos-translate)|
 |**Grok**|`grok`| `GORK_API_KEY`, `GORK_MODEL` | `[Your GORK_API_KEY]`, `grok-2-1212` |See [Grok](https://docs.x.ai/docs/overview)|
 |**DeepSeek**|`deepseek`| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | `[Your DEEPSEEK_API_KEY]`, `deepseek-chat` |See [DeepSeek](https://www.deepseek.com/)|
-|**OpenAI-Liked**|`openai-liked`| `OPENAILIKE_BASE_URL`, `OPENAILIKE_API_KEY`, `OPENAILIKE_MODEL` | `url`, `[Your Key]`, `model name` | None |
+|**OpenAI-Liked**|`openailiked`| `OPENAILIKED_BASE_URL`, `OPENAILIKED_API_KEY`, `OPENAILIKED_MODEL` | `url`, `[Your Key]`, `model name` | None |
 
 (need Japenese translation)
 For large language models that are compatible with the OpenAI API but not listed in the table above, you can set environment variables using the same method outlined for OpenAI in the table.
@@ -242,6 +250,12 @@ pdf2zh example.pdf -s openai:gpt-4o-mini
 
 ```bash
 set OPENAI_MODEL=gpt-4o-mini
+pdf2zh example.pdf -s openai
+```
+
+For PowerShell user:
+```shell
+$env:OPENAI_MODEL = gpt-4o-mini
 pdf2zh example.pdf -s openai
 ```
 

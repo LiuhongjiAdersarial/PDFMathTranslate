@@ -1,18 +1,19 @@
 [project]
 name = "pdf2zh"
-version = "1.8.8"
+version = "1.9.6"
 description = "Latex PDF Translator"
 authors = [{ name = "Byaidu", email = "byaidux@gmail.com" }]
 license = "AGPL-3.0"
 readme = "README.md"
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10,<3.13"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
 dependencies = [
     "requests",
-    "pymupdf",
+    # for arm64 linux whells
+    "pymupdf<1.25.3",
     "tqdm",
     "tenacity",
     "numpy",
@@ -26,27 +27,34 @@ dependencies = [
     "onnx",
     "onnxruntime",
     "opencv-python-headless",
-    "tencentcloud-sdk-python",
+    "tencentcloud-sdk-python-tmt",
     "pdfminer.six>=20240706",
     "gradio_pdf>=0.0.21",
     "pikepdf",
     "peewee>=3.17.8",
-    "argostranslate",
-    "fontTools"
+    "fontTools",
+    "babeldoc>=0.1.22, <0.3.0",
+    "rich"
 ]
 
 [project.optional-dependencies]
+backend = [
+    "flask",
+    "celery",
+    "redis"
+]
+argostranslate = [
+    "argostranslate"
+]
+
+[dependency-groups]
 dev = [
     "black",
     "flake8",
     "pre-commit",
     "pytest",
-    "build"
-]
-backend = [
-    "flask",
-    "celery",
-    "redis"
+    "build",
+    "bumpver>=2024.1130",
 ]
 
 [project.urls]
@@ -62,3 +70,18 @@ pdf2zh = "pdf2zh.pdf2zh:main"
 [tool.flake8]
 ignore = ["E203", "E261", "E501", "W503", "E741"]
 max-line-length = 88
+
+
+
+[bumpver]
+current_version = "1.9.6"
+version_pattern = "MAJOR.MINOR.PATCH[.PYTAGNUM]"
+
+[bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+    'version = "{version}"'
+]
+"pdf2zh/__init__.py" = [
+    '__version__ = "{version}"'
+]
